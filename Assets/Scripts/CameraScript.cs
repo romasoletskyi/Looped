@@ -20,3 +20,5 @@ public class CameraScript : MonoBehaviour
         transform.position = Vector3.Lerp(transform.position, _player.transform.position, Smoothing * 50 * Time.fixedDeltaTime);
     }
 }
+
+

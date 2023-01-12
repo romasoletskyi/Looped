@@ -1,0 +1,35 @@
+{
+    "messages":[ 
+        {
+            "id": 0, 
+            "possibilities": [ 
+                {
+                    "categories":[1, 4, 5], 
+                    "parameters": { 
+                        "rebellion":8, 
+                        "fearPropension":8,
+                        "popularity":0.7,
+                        "animosity":-0.2,
+                        "politicalAgreement":8,
+                        "fear":0
+                    },
+                    "contents":"Heyo!", 
+                    "options":[1, 2, 3] 
+                },
+                {
+                    "categories":[0, 2], 
+                    "parameters": { 
+                        "rebellion":0.25, 
+                        "fearPropension":8,
+                        "popularity":8,
+                        "animosity":8,
+                        "politicalAgreement":0.3,
+                        "fear":8
+                    },
+                    "contents":"Hello.", 
+                    "options":[1, 2, 3] 
+                }
+            ]
+        }
+    ]
+}

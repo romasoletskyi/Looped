@@ -1,0 +1,19 @@
+body {
+    background-color: wheat;
+}
+
+#chatBox {
+    margin: 50px;
+    padding: 30px;
+    border-radius: 30px;
+    background-color: rgb(226, 200, 150);
+    box-shadow: 0 0 10px -4px black;
+}
+
+#parametersBox {
+    margin: 50px;
+    padding: 30px;
+    border-radius: 30px;
+    background-color: rgb(226, 200, 150);
+    box-shadow: 0 0 10px -4px black;
+}

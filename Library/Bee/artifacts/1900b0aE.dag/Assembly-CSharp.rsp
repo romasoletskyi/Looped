@@ -354,7 +354,9 @@
 -r:"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.UI.ref.dll"
 "Assets/Scripts/CameraScript.cs"
 "Assets/Scripts/CharacterMovement.cs"
-"Assets/Scripts/Clock.cs"
+"Assets/Scripts/GameState.cs"
+"Assets/Scripts/NPCScript.cs"
+"Assets/Scripts/PriorityQueue.cs"
 -langversion:9.0
 
 /deterministic

@@ -1,0 +1,44 @@
+<!DOCTYPE html> 
+<html lang=eng>
+<head>
+	<title>Throw Back - Chat simulation</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta charset="UTF-8" />
+	<script>
+		addEventListener("load", function () {
+			setTimeout(hideURLbar, 0);
+		}, false);
+
+		function hideURLbar() {
+			window.scrollTo(0, 1);
+		}
+	</script>    
+	<link rel="stylesheet" href="style.css" type="text/css" media="all" />
+</head>
+
+<body>
+    <!-- Choice of parameters -->
+    <div id="parametersBox">
+    <span>Animosity: <input type="range" id=""/></span>
+    <span>Popularity: <input type="range" id=""/></span>
+    <span>Rebellion: <input type="range" id=""/></span>
+    <span>Fear: <input type="range" id=""/></span>
+    <span>Perception: <input type="range" id=""/></span>
+    </div>
+    <!-- End of parameters choice -->
+
+    <!-- Chat interface -->
+    <div id="chatBox">
+    <div>How are you?</div>
+    <div id="answersBox">
+    <button>I'm fine, thank you</button><br>
+    <button>How is that your problem?</button><br>
+    <button>Good, and you?</button>
+    </div>
+    </div>
+    <!-- End of chat interface -->
+
+    <script type="text/javascript" src="script.js"></script>
+</body>
+
+</html>

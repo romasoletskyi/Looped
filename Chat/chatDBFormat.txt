@@ -1,0 +1,22 @@
+{
+    "messages":[ // list of all messages
+        {
+            "id": 0, // identifier referenced in the options of a previous message (id 0 is the start of a conversation)
+            "possibilities": [ // list of possible messages going along the theme (in this exemple, greeting messages)
+                {
+                    "categories":[0,1, 2], // categories this message could be said by
+                    "parameters": { // parameters of someone most likely to say that
+                        "rebellion":8, // put an 8 if the parameter should not count or influence this answer
+                        "fearPropension":8,
+                        "popularity":0.7,
+                        "animosity":-0.2,
+                        "politicalAgreement":8,
+                        "fear":0
+                    },
+                    "contents":"How are you?", // content of the message
+                    "options":[1, 2, 3] // options to reply
+                }
+            ]
+        }
+    ]
+}
