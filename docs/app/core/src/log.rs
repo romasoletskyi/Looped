@@ -7,6 +7,13 @@ extern "C" {
 }
 
 #[macro_export]
+#[cfg(target_arch = "wasm32")]
 macro_rules! console_log {
     ($($t:tt)*) => ($crate::log::log(&format_args!($($t)*).to_string()))
+}
+
+#[macro_export]
+#[cfg(not(target_arch = "wasm32"))]
+macro_rules! console_log {
+    ($($t:tt)*) => (format!($($t)*))
 }

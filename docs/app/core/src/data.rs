@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, BTreeSet};
 use std::fmt::{self, Error, Formatter};
 use std::hash::Hash;
 use std::iter::zip;
@@ -9,20 +9,19 @@ use std::vec;
 use rand::Rng;
 use rand::{rngs::ThreadRng, thread_rng};
 use serde_derive::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
 
 use crate::console_log;
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
-pub enum Job {
+enum Job {
     Farmer,
     Merchant,
     Priest,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub struct Character {
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+struct Character {
     hostile: i8,
     rebellious: i8,
 }
@@ -33,14 +32,14 @@ impl Character {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub struct Person {
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+struct Person {
     job: Job,
     character: Character,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub struct GeneralPerson(Option<Person>);
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+struct GeneralPerson(Option<Person>);
 
 impl GeneralPerson {
     fn distance(&self, other: &GeneralPerson) -> f32 {
@@ -75,8 +74,8 @@ impl GeneralPerson {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Phrase {
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct Phrase {
     texts: Vec<String>,
     responses: Vec<(usize, GeneralPerson)>,
 }
@@ -91,86 +90,80 @@ impl Phrase {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq)]
-struct WordCloud(String);
+pub struct WordCloud(String);
+
+impl WordCloud {
+    pub fn new(s: &str) -> Self {
+        WordCloud(s.to_string())
+    }
+}
 
 impl FromStr for WordCloud {
     type Err = serde_json::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(WordCloud(
-            s.replace(&['(', ')', ',', '\"', '.', ';', ':', '\''][..], "")
+        Ok(WordCloud::new(
+            s.replace(&['(', ')', ',', '\"', '.', ';', ':', '\'', '?', '!', '-'], "")
+                .to_lowercase()
                 .split(' ')
-                .fold(String::new(), |a, b| a + b + " "),
+                .fold(String::new(), |a, b| a + b + " ")
+                .trim_end()
         ))
     }
 }
 
 impl PartialEq for WordCloud {
     fn eq(&self, other: &Self) -> bool {
-        self.0.split(' ').collect::<HashSet<&str>>()
-            == other.0.split(' ').collect::<HashSet<&str>>()
+        self.0.split(' ').collect::<BTreeSet<&str>>()
+            == other.0.split(' ').collect::<BTreeSet<&str>>()
     }
 }
 
 impl Hash for WordCloud {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        for word in self.0.split(' ').collect::<HashSet<&str>>() {
+        for word in self.0.split(' ').collect::<BTreeSet<&str>>() {
             word.hash(state);
         }
     }
-}
-
-fn iter_to_jsarray<I>(iterator: I) -> Box<[JsValue]>
-where
-    I: Iterator,
-    wasm_bindgen::JsValue: From<<I as Iterator>::Item>,
-{
-    let mut vec = Vec::new();
-    for value in iterator {
-        vec.push(JsValue::from(value));
-    }
-    vec.into_boxed_slice()
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DatabaseDifference {
     texts: HashMap<usize, usize>,
     responses: HashMap<usize, usize>,
-    start_indices: Option<usize>,
 }
 
 impl DatabaseDifference {
     fn new() -> Self {
         DatabaseDifference {
             texts: HashMap::new(),
-            responses: HashMap::new(),
-            start_indices: None,
+            responses: HashMap::new()
         }
     }
 }
 
-#[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Database {
     phrases: Vec<Phrase>,
     phrase_indices: HashMap<WordCloud, usize>,
-    start_indices: Vec<(usize, GeneralPerson)>,
     difference: DatabaseDifference,
 }
 
-#[wasm_bindgen]
 impl Database {
     pub fn new() -> Self {
         Database {
             phrases: Vec::new(),
             phrase_indices: HashMap::new(),
-            start_indices: Vec::new(),
             difference: DatabaseDifference::new(),
         }
     }
 
     pub fn from_str(s: &str) -> Option<Database> {
         serde_json::from_str(s).ok()
+    }
+
+    pub fn from_slice(slice: &[u8]) -> Option<Database> {
+        serde_json::from_slice(slice).ok()
     }
 
     pub fn difference(&mut self) -> Database {
@@ -187,15 +180,8 @@ impl Database {
             let length = database.phrases.len();
             database.difference.texts.insert(length, 0);
             database.difference.responses.insert(length, 0);
-            database.phrases.push(Phrase { texts, responses })
+            database.phrases.push(Phrase { texts, responses });
         }
-
-        database.difference.start_indices = Some(0);
-        database.start_indices = self.start_indices[self
-            .difference
-            .start_indices
-            .unwrap_or(self.start_indices.len())..]
-            .to_vec();
 
         self.difference = DatabaseDifference::new();
         database
@@ -204,6 +190,7 @@ impl Database {
     // merges starting from database.difference indices
     pub fn merge(&mut self, database: Database) {
         let mut index_to_merged = HashMap::new();
+        console_log!("{:?}", database);
 
         for (index, start) in database.difference.texts {
             let texts_slice = &database.phrases[index].texts[start..];
@@ -214,9 +201,11 @@ impl Database {
             }
         }
 
+        console_log!("{:?}", index_to_merged);
+
         for (index, start) in database.difference.responses {
             self.insert_responses_to(
-                Some(index_to_merged[&index]),
+                index_to_merged[&index],
                 database.phrases[index].responses[start..]
                     .iter()
                     .map(|response| {
@@ -227,22 +216,12 @@ impl Database {
                     }),
             );
         }
-
-        self.insert_responses_to(
-            None,
-            database.start_indices[database
-                .difference
-                .start_indices
-                .unwrap_or(database.start_indices.len())..]
-                .iter()
-                .copied(),
-        )
     }
 }
 
 impl Database {
-    pub fn from_slice(slice: &[u8]) -> Option<Self> {
-        serde_json::from_slice(slice).ok()
+    fn get_start_index(&self) -> usize {
+        *self.phrase_indices.get(&WordCloud("".to_string())).unwrap()
     }
 
     fn insert_texts_at<I: IntoIterator<Item = String>>(
@@ -275,22 +254,14 @@ impl Database {
 
     fn insert_responses_to<I: IntoIterator<Item = (usize, GeneralPerson)>>(
         &mut self,
-        query: Option<usize>,
+        index: usize,
         responses: I,
     ) {
-        if let Some(index) = query {
-            self.difference
-                .responses
-                .entry(index)
-                .or_insert(self.phrases[index].responses.len());
-            &mut self.phrases[index].responses
-        } else {
-            if self.difference.start_indices.is_none() {
-                self.difference.start_indices = Some(self.start_indices.len());
-            }
-            &mut self.start_indices
-        }
-        .extend(responses);
+        self.difference
+            .responses
+            .entry(index)
+            .or_insert(self.phrases[index].responses.len());
+        self.phrases[index].responses.extend(responses);
     }
 }
 
@@ -310,9 +281,44 @@ impl fmt::Display for Database {
     }
 }
 
+impl PartialEq for Database {
+    fn eq(&self, other: &Self) -> bool {
+        let mut to_other = HashMap::new();
+
+        for (cloud, index) in &self.phrase_indices {
+            if let Some(&other_index) = other.phrase_indices.get(cloud) {
+                to_other.insert(index, other_index);
+            } else {
+                return false;
+            }
+        }
+
+        for (index, phrase) in (&self.phrases).iter().enumerate() {
+            let other_phrase = &other.phrases[to_other[&index]];
+            if phrase.texts != other_phrase.texts {
+                return false;
+            }
+
+            if phrase.responses.len() != other_phrase.responses.len() {
+                return false;
+            }
+            
+            for i in 0..phrase.responses.len() {
+                if to_other[&phrase.responses[i].0] != other_phrase.responses[i].0 {
+                    return false;
+                }
+                if phrase.responses[i].1 != other_phrase.responses[i].1 {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
 const CHAT_VARIANTS: usize = 4;
 
-#[wasm_bindgen]
 pub struct Chat {
     database: *mut Database,
     gen: ThreadRng,
@@ -322,9 +328,10 @@ pub struct Chat {
     you_talk: bool,
 }
 
-#[wasm_bindgen]
 impl Chat {
     pub fn new(database: &mut Database, you_talk: bool, person_descrirption: &str) -> Self {
+        database.insert_texts_at("", vec!["".to_string()]);
+
         Chat {
             database,
             gen: thread_rng(),
@@ -339,12 +346,9 @@ impl Chat {
         }
     }
 
-    pub fn get_phrases(&mut self) -> Box<[JsValue]> {
-        let options = if let Some(index) = self.query {
-            self.get_database().phrases[index].responses.clone()
-        } else {
-            self.get_database().start_indices.clone()
-        };
+    pub fn get_phrases(&mut self) -> Vec<String> {
+        let index = self.query.unwrap_or(self.get_database().get_start_index());
+        let options = self.get_database().phrases[index].responses.clone();
 
         let probability: Vec<f32> = options
             .iter()
@@ -352,29 +356,23 @@ impl Chat {
             .collect();
         let queries = self.sample_queries(options, probability);
 
-        let text_options = iter_to_jsarray(
-            queries
-                .iter()
-                .map(|query| self.choose_random_phrase(*query)),
-        );
+        let text_options = queries.iter().map(|query| self.choose_random_phrase(*query)).collect();
         self.query_options = queries;
 
         text_options
     }
 
     pub fn add_phrase(&mut self, text: &str) {
-        if let Some(real_index) = self
+        if let Some(phrase_index) = self
             .get_database()
             .insert_texts_at(text, vec![text.to_string()])
         {
-            let query = self.query;
+            let previous_index = self.query.unwrap_or(self.get_database().get_start_index());
             let person = self.person;
             self.get_database()
-                .insert_responses_to(query, vec![(real_index, person)]);
-            self.query = Some(real_index);
+                .insert_responses_to(previous_index, vec![(phrase_index, person)]);
+            self.query = Some(phrase_index);
         }
-
-        console_log!("{:?}", self.get_database());
     }
 
     pub fn choose_phrase(&mut self, option_number: usize) {
@@ -407,7 +405,7 @@ impl Chat {
             }
             let mut queries = Vec::new();
 
-            while options.len() < std::cmp::min(CHAT_VARIANTS, options.len()) {
+            while queries.len() < std::cmp::min(CHAT_VARIANTS, options.len()) {
                 let p = self.gen.gen_range(0.0..1.0f32);
                 let query = cumulative
                     .binary_search_by(|x| f32::total_cmp(x, &p))
