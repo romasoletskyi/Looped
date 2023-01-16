@@ -15,5 +15,5 @@ macro_rules! console_log {
 #[macro_export]
 #[cfg(not(target_arch = "wasm32"))]
 macro_rules! console_log {
-    ($($t:tt)*) => (format!($($t)*))
+    ($($t:tt)*) => (println!($($t)*))
 }

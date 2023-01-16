@@ -29,6 +29,10 @@ impl ClientDatabase {
         Database::from_str(s).map(|database| ClientDatabase(database))
     }
 
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
     pub fn merge(&mut self, database: ClientDatabase) {
         self.0.merge(database.0)
     }

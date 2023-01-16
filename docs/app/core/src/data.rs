@@ -167,20 +167,17 @@ impl Database {
     }
 
     pub fn difference(&mut self) -> Database {
-        let mut database = Database::new();
+        console_log!("{:?}", self.difference);
+        let mut database = Database::new();        
 
-        for (&index, &start) in &self.difference.texts {
-            let texts = self.phrases[index].texts[start..].to_vec();
-            let responses = if let Some(&response_start) = self.difference.responses.get(&index) {
-                self.phrases[index].responses[response_start..].to_vec()
-            } else {
-                Vec::new()
-            };
+        for (&index, &text) in &self.difference.texts {
+            self.add_difference(&mut database, index, Some(text), self.difference.responses.get(&index).copied());
+        }
 
-            let length = database.phrases.len();
-            database.difference.texts.insert(length, 0);
-            database.difference.responses.insert(length, 0);
-            database.phrases.push(Phrase { texts, responses });
+        for (&index, &response) in &self.difference.responses {
+            if self.difference.texts.get(&index).is_none() {
+                self.add_difference(&mut database, index, None, Some(response));
+            }
         }
 
         self.difference = DatabaseDifference::new();
@@ -188,10 +185,9 @@ impl Database {
     }
 
     // merges starting from database.difference indices
+    // all response indices have to be present in database.phrase_indices
     pub fn merge(&mut self, database: Database) {
         let mut index_to_merged = HashMap::new();
-        console_log!("{:?}", database);
-
         for (index, start) in database.difference.texts {
             let texts_slice = &database.phrases[index].texts[start..];
             if let Some(merged_index) =
@@ -201,20 +197,19 @@ impl Database {
             }
         }
 
-        console_log!("{:?}", index_to_merged);
+        let mut index_to_cloud : HashMap<usize, WordCloud>= HashMap::new();
+        for (cloud, index) in database.phrase_indices {
+            index_to_cloud.insert(index, cloud);
+        }
 
         for (index, start) in database.difference.responses {
-            self.insert_responses_to(
-                index_to_merged[&index],
-                database.phrases[index].responses[start..]
-                    .iter()
-                    .map(|response| {
-                        (
-                            *index_to_merged.get(&response.0).unwrap_or(&response.0),
-                            response.1,
-                        )
-                    }),
-            );
+            let responses: Vec<(usize, GeneralPerson)> = database.phrases[index].responses[start..]
+            .iter()
+            .map(|response| {
+                let merged_index = self.phrase_indices.get(index_to_cloud.get(&response.0).unwrap()).unwrap();
+                (*merged_index, response.1) 
+            }).collect();
+            self.insert_responses_to(index_to_merged[&index], responses);
         }
     }
 }
@@ -262,6 +257,27 @@ impl Database {
             .entry(index)
             .or_insert(self.phrases[index].responses.len());
         self.phrases[index].responses.extend(responses);
+    }
+
+    fn add_difference(&self, database: &mut Database, index: usize, text: Option<usize>, response: Option<usize>) {
+        let texts = if let Some(text_start) = text {
+            self.phrases[index].texts[text_start..].to_vec()
+        } else {
+            Vec::new()
+        };
+        let responses = if let Some(response_start) = response {
+            for &(response_index, _) in &self.phrases[index].responses[response_start..] {
+                database.phrase_indices.insert(WordCloud::from_str(&self.phrases[response_index].texts[0]).unwrap(), response_index);
+            }
+            self.phrases[index].responses[response_start..].to_vec()
+        } else {
+            Vec::new()
+        };
+
+        let length = database.phrases.len();
+        database.difference.texts.insert(length, 0);
+        database.difference.responses.insert(length, 0);
+        database.phrases.push(Phrase { texts, responses });
     }
 }
 
@@ -366,24 +382,34 @@ impl Chat {
         if let Some(phrase_index) = self
             .get_database()
             .insert_texts_at(text, vec![text.to_string()])
-        {
-            let previous_index = self.query.unwrap_or(self.get_database().get_start_index());
-            let person = self.person;
-            self.get_database()
-                .insert_responses_to(previous_index, vec![(phrase_index, person)]);
-            self.query = Some(phrase_index);
+        {   
+            self.add_response(phrase_index);
+            self.finish_turn(phrase_index);
         }
     }
 
     pub fn choose_phrase(&mut self, option_number: usize) {
-        self.query = Some(self.query_options[option_number]);
-        self.you_talk = !self.you_talk;
+        let response_index = self.query_options[option_number];
+        self.add_response(response_index);
+        self.finish_turn(response_index);
     }
 }
 
 impl Chat {
     fn get_database(&mut self) -> &mut Database {
         unsafe { &mut (*self.database) }
+    }
+
+    fn add_response(&mut self, response_index: usize) {
+        let previous_index = self.query.unwrap_or(self.get_database().get_start_index());
+        let person = self.person;
+        self.get_database()
+            .insert_responses_to(previous_index, vec![(response_index, person)]);
+    }
+
+    fn finish_turn(&mut self, response_index: usize) {
+        self.query = Some(response_index);
+        self.you_talk = !self.you_talk;
     }
 
     fn sample_queries(
@@ -407,10 +433,11 @@ impl Chat {
 
             while queries.len() < std::cmp::min(CHAT_VARIANTS, options.len()) {
                 let p = self.gen.gen_range(0.0..1.0f32);
-                let query = cumulative
+                let index = cumulative
                     .binary_search_by(|x| f32::total_cmp(x, &p))
                     .map_or_else(|x| x, |x| x);
 
+                let query = options[index].0;
                 if !queries.iter().any(|&x| x == query) {
                     queries.push(query);
                 }

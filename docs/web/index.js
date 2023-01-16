@@ -1,9 +1,11 @@
-import { Database, Chat } from "wasm-core"
+import { ClientDatabase, ClientChat } from "wasm-core"
+
+const serverURL = "http://127.0.0.1:3000";
 
 const jobs = [
-    "farmer",
-    "merchant",
-    "priest"
+    "Farmer",
+    "Merchant",
+    "Priest"
 ]
 
 const traits = [
@@ -16,7 +18,7 @@ const maxTrait = 5;
 
 // returns number from Uniform[start, end]
 function randomInteger(start, end) {
-    return Math.floor(Math.random() * (end + 1 - start)) + start
+    return Math.floor(Math.random() * (end + 1 - start)) + start;
 }
 
 const approach = document.getElementById("poll-job");
@@ -54,6 +56,8 @@ function restartSituation() {
         approach.textContent = "You are approached by a";
     }
 
+    jobDescription.selectedIndex = randomInteger(0, jobDescription.length - 1);
+
     traitList.textContent = "";
     for (const trait of traits) {
         const op = document.createElement("div");
@@ -77,16 +81,38 @@ function restartSituation() {
     chatHistory.textContent = "";
 }
 
+function serializePerson() {
+    let character = {}
+    for (const trait of traits) {
+        character[trait] = parseInt(document.getElementById("slider-" + trait).value);
+    }
+    return JSON.stringify({"job": jobs[jobDescription.selectedIndex], "character": character});
+}
+
 let youTalk = randomInteger(0, 1) === 0;
 initialize();
 restartSituation();
 
-const database = Database.new();
-let chat = Chat.new(database, youTalk);
+const person = serializePerson();
+const database = ClientDatabase.new();
+let chat = ClientChat.new(database, youTalk, person);
+
+function loadDatabase() {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.onreadystatechange = () => { 
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+            server_database = ClientDatabase.from_str(xmlHttp.responseText);
+            if (server_database) {
+                database.merge(server_database);
+            }
+    }
+    xmlHttp.open("GET", serverURL, true);
+    xmlHttp.send(null);
+}
+// loadDatabase();
 
 function postPhrases() {
     const phrases = chat.get_phrases();
-    console.log(phrases);
     phraseList.textContent = "";
 
     for (const [index, phrase] of phrases.entries()) {
@@ -112,7 +138,7 @@ function postPhrases() {
     const add = document.createElement("div");
     add.id = "add-answer";
     add.textContent = "Add answer";
-    add.setAttribute("onclick", "location.href='#';")
+    add.setAttribute("onclick", "location.href='#';");
     add.style = "cursor: pointer;";
     op.appendChild(add);
     
@@ -151,5 +177,8 @@ function updateChatHistory(message) {
 }
 
 function saveConversationBackup() {
-    const blob = new Blob([])
+    const a = document.createElement("a");
+    a.href = window.URL.createObjectURL(new Blob([database.to_string()], {type: "text/plain"}));
+    a.download = "database.json";
+    a.click();
 }
