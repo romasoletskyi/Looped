@@ -1,5 +1,8 @@
-pub mod data;
+pub mod database;
 pub mod log;
 pub mod wasm;
 
-mod test_data;
+mod data;
+mod chat;
+
+mod test_database;

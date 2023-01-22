@@ -1,8 +1,9 @@
 use wasm_bindgen::prelude::*;
 
-use crate::data::{Chat, Database};
+use crate::database::{Database, SERVER};
+use crate::chat::Chat;
 
-// light-weight wrapper around crate::data for direct wasm use
+// light-weight wrapper around crate::database/chat for direct wasm use
 
 fn iter_to_jsarray<I>(iterator: I) -> Box<[JsValue]>
 where
@@ -22,7 +23,9 @@ pub struct ClientDatabase(Database);
 #[wasm_bindgen]
 impl ClientDatabase {
     pub fn new() -> Self {
-        ClientDatabase(Database::new())
+        let mut database = Database::new();
+        database.updated(SERVER);
+        ClientDatabase(database)
     }
 
     pub fn from_str(s: &str) -> Option<ClientDatabase> {
@@ -34,11 +37,12 @@ impl ClientDatabase {
     }
 
     pub fn merge(&mut self, database: ClientDatabase) {
-        self.0.merge(database.0)
+        self.0.merge(database.0);
+        self.0.updated(SERVER);
     }
 
     pub fn difference(&mut self) -> ClientDatabase {
-        ClientDatabase(self.0.difference())
+        ClientDatabase(self.0.difference(SERVER))
     }
 }
 
