@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 
 use crate::chat::Chat;
-use crate::console_log;
 use crate::database::{Database, SERVER};
 
 // light-weight wrapper around crate::database/chat for direct wasm use

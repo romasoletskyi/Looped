@@ -11,8 +11,12 @@ use serde_derive::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Job {
     Farmer,
+    Fisherman,
+    Miner,
     Merchant,
-    Priest,
+    Politician,
+    Noble,
+    Priest
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
