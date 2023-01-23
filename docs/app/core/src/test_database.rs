@@ -1,26 +1,33 @@
-use std::str::FromStr;
+use rand::{rngs::ThreadRng, Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use std::collections::HashSet;
 use std::iter::zip;
-use rand::{Rng, rngs::ThreadRng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use std::str::FromStr;
 
+use crate::chat::Chat;
 use crate::data::WordCloud;
 use crate::database::{Database, SERVER};
-use crate::chat::Chat;
 
 #[test]
 fn test_wordcloud() {
     assert_eq!(WordCloud::from_str("").unwrap(), WordCloud::new(""));
-    assert_eq!(WordCloud::from_str("Hello, how are you?").unwrap(), WordCloud::new("hello how are you"));
-    assert_eq!(WordCloud::from_str("fine, thanks!").unwrap(), WordCloud::new("fine thanks"));
+    assert_eq!(
+        WordCloud::from_str("Hello, how are you?").unwrap(),
+        WordCloud::new("hello how are you")
+    );
+    assert_eq!(
+        WordCloud::from_str("fine, thanks!").unwrap(),
+        WordCloud::new("fine thanks")
+    );
 }
 
 fn initialize_chat(database: &mut Database, rng: &mut ChaCha8Rng) -> Chat {
     let person = format!(
-        r#"{{"job": "{}", "character": {{"hostile": {}, "rebellious": {}}}}}"#, 
-    ["Farmer", "Merchant", "Priest"][rng.gen_range(0..3)],
-    rng.gen_range(-5..=5),
-    rng.gen_range(-5..=5));
+        r#"{{"job": "{}", "character": {{"hostile": {}, "rebellious": {}}}}}"#,
+        ["Farmer", "Merchant", "Priest"][rng.gen_range(0..3)],
+        rng.gen_range(-5..=5),
+        rng.gen_range(-5..=5)
+    );
     Chat::new(database, rng.gen_bool(0.5), &person)
 }
 
@@ -31,7 +38,7 @@ fn generate_words(rng: &mut ChaCha8Rng) -> Vec<String> {
         let word_length = rng.gen_range(2..=6);
         let mut word = String::new();
         for _ in 0..word_length {
-            word.push(('a' as u8 + rng.gen_range(0..26) as u8) as char);
+            word.push((b'a' + rng.gen_range(0..26) as u8) as char);
         }
         words.push(word);
     }
@@ -56,9 +63,9 @@ fn client_chat(client: &mut Database, rng: &mut ChaCha8Rng, words: &Vec<String>)
     let chat_length = rng.gen_range(5..20);
 
     for _ in 0..chat_length {
-        let phrases = chat.get_phrases();            
+        let phrases = chat.get_phrases();
         if rng.gen_bool(1.0 / (1.0 + phrases.len() as f64)) {
-            chat.add_phrase(&generate_text(&words, rng))
+            chat.add_phrase(&generate_text(words, rng))
         } else {
             chat.choose_phrase(rng.gen_range(0..phrases.len()))
         }
@@ -79,8 +86,8 @@ fn test_database_merge_basic() {
     for _ in 0..10 {
         server.merge(client_chat(&mut client, &mut rng, &words));
         client.updated(SERVER);
-        assert_eq!(client, server);   
-    }  
+        assert_eq!(client, server);
+    }
 }
 
 #[test]
@@ -121,7 +128,7 @@ fn test_database_merge_concurrent() {
             server.updated(&ip);
             assert_eq!(client, &mut server);
         }
-        
+
         let difference = server.difference(&ip);
         server.merge(client_chat(client, &mut rng, &words));
 

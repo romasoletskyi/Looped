@@ -1,7 +1,8 @@
 use wasm_bindgen::prelude::*;
 
-use crate::database::{Database, SERVER};
 use crate::chat::Chat;
+use crate::console_log;
+use crate::database::{Database, SERVER};
 
 // light-weight wrapper around crate::database/chat for direct wasm use
 
@@ -29,7 +30,10 @@ impl ClientDatabase {
     }
 
     pub fn from_str(s: &str) -> Option<ClientDatabase> {
-        Database::from_str(s).map(|database| ClientDatabase(database))
+        Database::from_str(s).map(|mut database| {
+            database.updated(SERVER);
+            ClientDatabase(database)
+        })
     }
 
     pub fn to_string(&self) -> String {

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::iter::zip;
 use rand::Rng;
 use rand::{rngs::ThreadRng, thread_rng};
+use std::collections::HashMap;
+use std::iter::zip;
 
 use crate::data::GeneralPerson;
 use crate::database::Database;
@@ -13,7 +13,7 @@ pub struct Chat {
     gen: ThreadRng,
     query_options: Vec<usize>,
     query: Option<usize>,
-    person: GeneralPerson
+    person: GeneralPerson,
 }
 
 impl Chat {
@@ -25,7 +25,10 @@ impl Chat {
             gen: thread_rng(),
             query_options: Vec::new(),
             query: None,
-            person: GeneralPerson::new(serde_json::from_str(person_descrirption).unwrap(), you_talk)
+            person: GeneralPerson::new(
+                serde_json::from_str(person_descrirption).unwrap(),
+                you_talk,
+            ),
         }
     }
 
@@ -39,7 +42,10 @@ impl Chat {
             .collect();
         let queries = self.sample_queries(options, probability);
 
-        let text_options = queries.iter().map(|query| self.choose_random_phrase(*query)).collect();
+        let text_options = queries
+            .iter()
+            .map(|query| self.choose_random_phrase(*query))
+            .collect();
         self.query_options = queries;
 
         text_options
@@ -49,7 +55,7 @@ impl Chat {
         if let Some(phrase_index) = self
             .get_database()
             .insert_texts_at(text, vec![text.to_string()])
-        {   
+        {
             self.add_response(phrase_index);
             self.finish_turn(phrase_index);
         }

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::fmt::{Formatter, Error, Display, Result};
+use std::fmt::{Display, Error, Formatter, Result};
 use std::str::FromStr;
 
 use serde_derive::{Deserialize, Serialize};
 
-use crate::data::{Phrase, WordCloud, GeneralPerson};
+use crate::data::{GeneralPerson, Phrase, WordCloud};
 
 pub const SERVER: &str = "server";
 
@@ -18,19 +18,21 @@ impl DatabaseDifference {
     fn new() -> Self {
         DatabaseDifference {
             texts: HashMap::new(),
-            responses: HashMap::new()
+            responses: HashMap::new(),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct DifferenceManager {
-    differences: HashMap<String, DatabaseDifference>
+    differences: HashMap<String, DatabaseDifference>,
 }
 
 impl DifferenceManager {
     fn new() -> Self {
-        DifferenceManager { differences: HashMap::new() }
+        DifferenceManager {
+            differences: HashMap::new(),
+        }
     }
 
     fn insert_text(&mut self, index: usize, start: usize) {
@@ -51,15 +53,20 @@ impl DifferenceManager {
 
         if let Some(difference) = self.differences.get(client) {
             for (&index, &text) in &difference.texts {
-                base.add_difference(&mut database, index, Some(text), difference.responses.get(&index).copied());
+                base.add_difference(
+                    &mut database,
+                    index,
+                    Some(text),
+                    difference.responses.get(&index).copied(),
+                );
             }
-    
+
             for (&index, &response) in &difference.responses {
                 if difference.texts.get(&index).is_none() {
                     base.add_difference(&mut database, index, None, Some(response));
                 }
             }
-        }       
+        }
 
         database
     }
@@ -67,7 +74,7 @@ impl DifferenceManager {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Database {
-    pub (crate) phrases: Vec<Phrase>,
+    pub(crate) phrases: Vec<Phrase>,
     phrase_indices: HashMap<WordCloud, usize>,
     manager: DifferenceManager,
 }
@@ -90,11 +97,13 @@ impl Database {
     }
 
     pub fn updated(&mut self, client: &str) {
-        self.manager.differences.insert(client.to_string(), DatabaseDifference::new());
+        self.manager
+            .differences
+            .insert(client.to_string(), DatabaseDifference::new());
     }
 
     pub fn difference(&mut self, client: &str) -> Database {
-        self.manager.difference(&self, client)   
+        self.manager.difference(&self, client)
     }
 
     pub fn total_clone(&self) -> Database {
@@ -111,7 +120,7 @@ impl Database {
     // merges starting from database.difference indices
     // all response indices have to be present in database.phrase_indices
     pub fn merge(&mut self, database: Database) {
-        let mut index_to_cloud : HashMap<usize, WordCloud>= HashMap::new();
+        let mut index_to_cloud: HashMap<usize, WordCloud> = HashMap::new();
         for (cloud, index) in database.phrase_indices {
             index_to_cloud.insert(index, cloud);
         }
@@ -122,31 +131,39 @@ impl Database {
         for (&index, &start) in &difference.texts {
             let texts_slice = &database.phrases[index].texts[start..];
 
-            if let Some(merged_index) =
-                self.insert_texts_at(database.phrases[index].texts[0].as_str(), texts_slice.iter().cloned())
-            {   
+            if let Some(merged_index) = self.insert_texts_at(
+                database.phrases[index].texts[0].as_str(),
+                texts_slice.iter().cloned(),
+            ) {
                 merged_indices.insert(index, merged_index);
             }
         }
 
         for (&index, &start) in &difference.responses {
             let responses: Vec<(usize, GeneralPerson)> = database.phrases[index].responses[start..]
-            .iter()
-            .map(|response| {
-                let merged_index = self.phrase_indices.get(index_to_cloud.get(&response.0).unwrap()).unwrap();
-                (*merged_index, response.1) 
-            }).collect();
+                .iter()
+                .map(|response| {
+                    let merged_index = self
+                        .phrase_indices
+                        .get(index_to_cloud.get(&response.0).unwrap())
+                        .unwrap();
+                    (*merged_index, response.1)
+                })
+                .collect();
             self.insert_responses_to(*merged_indices.get(&index).unwrap(), responses);
         }
     }
 }
 
 impl Database {
-    pub (crate) fn get_start_index(&self) -> usize {
-        *self.phrase_indices.get(&WordCloud::from_str("").unwrap()).unwrap()
+    pub(crate) fn get_start_index(&self) -> usize {
+        *self
+            .phrase_indices
+            .get(&WordCloud::from_str("").unwrap())
+            .unwrap()
     }
 
-    pub (crate) fn insert_texts_at<I: IntoIterator<Item = String>>(
+    pub(crate) fn insert_texts_at<I: IntoIterator<Item = String>>(
         &mut self,
         base_text: &str,
         texts: I,
@@ -158,7 +175,8 @@ impl Database {
             if let Some(index) = phrase_index {
                 let text_vec: Vec<String> = texts.into_iter().collect();
                 if !text_vec.is_empty() {
-                    self.manager.insert_text(index, self.phrases[index].texts.len());
+                    self.manager
+                        .insert_text(index, self.phrases[index].texts.len());
                     self.phrases[index].texts.extend(text_vec);
                 }
             } else {
@@ -174,16 +192,23 @@ impl Database {
         }
     }
 
-    pub (crate) fn insert_responses_to<I: IntoIterator<Item = (usize, GeneralPerson)>>(
+    pub(crate) fn insert_responses_to<I: IntoIterator<Item = (usize, GeneralPerson)>>(
         &mut self,
         index: usize,
         responses: I,
     ) {
-        self.manager.insert_response(index, self.phrases[index].responses.len());
+        self.manager
+            .insert_response(index, self.phrases[index].responses.len());
         self.phrases[index].responses.extend(responses);
     }
 
-    fn add_difference(&self, database: &mut Database, index: usize, text: Option<usize>, response: Option<usize>) {
+    fn add_difference(
+        &self,
+        database: &mut Database,
+        index: usize,
+        text: Option<usize>,
+        response: Option<usize>,
+    ) {
         let length = database.phrases.len();
         let difference = database.manager.differences.get_mut(SERVER).unwrap();
 
@@ -198,7 +223,10 @@ impl Database {
         let responses = if let Some(response_start) = response {
             difference.responses.insert(length, 0);
             for &(response_index, _) in &self.phrases[index].responses[response_start..] {
-                database.phrase_indices.insert(WordCloud::from_str(&self.phrases[response_index].texts[0]).unwrap(), response_index);
+                database.phrase_indices.insert(
+                    WordCloud::from_str(&self.phrases[response_index].texts[0]).unwrap(),
+                    response_index,
+                );
             }
             self.phrases[index].responses[response_start..].to_vec()
         } else {
@@ -261,7 +289,11 @@ impl PartialEq for Database {
                 return false;
             }
 
-            let mapped_responses: Vec<(usize, GeneralPerson)> = phrase.responses.iter().map(|(index, person)| (to_other[index], *person)).collect();
+            let mapped_responses: Vec<(usize, GeneralPerson)> = phrase
+                .responses
+                .iter()
+                .map(|(index, person)| (to_other[index], *person))
+                .collect();
             if vec_to_multiset(&mapped_responses) != vec_to_multiset(&other_phrase.responses) {
                 return false;
             }

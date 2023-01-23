@@ -17,38 +17,50 @@ enum Job {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Character {
-    hostile: i8,
-    rebellious: i8,
+    rebellion: i8,
+    fear_propension: i8,
+    popularity: i8,
+    animosity: i8,
+    political_agreement: i8,
+    fear: i8,
 }
 
 impl Character {
     fn to_vec(self) -> Vec<f32> {
-        vec![self.hostile as f32, self.rebellious as f32]
+        vec![
+            self.rebellion as f32,
+            self.fear_propension as f32,
+            self.popularity as f32,
+            self.animosity as f32,
+            self.political_agreement as f32,
+            self.fear as f32,
+        ]
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub (crate) struct Person {
+pub(crate) struct Person {
     job: Job,
     character: Character,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub (crate) struct GeneralPerson {
+pub(crate) struct GeneralPerson {
     person: Person,
-    pub (crate) youtalk: bool
+    pub(crate) youtalk: bool,
 }
 
 impl GeneralPerson {
-    pub (crate) fn new(person: Person, youtalk: bool) -> Self {
-        GeneralPerson{ person, youtalk }
+    pub(crate) fn new(person: Person, youtalk: bool) -> Self {
+        GeneralPerson { person, youtalk }
     }
 
-    pub (crate) fn distance(&self, other: &GeneralPerson) -> f32 {
+    pub(crate) fn distance(&self, other: &GeneralPerson) -> f32 {
         if self.youtalk != other.youtalk {
             return 2.0;
         }
-        (self.person.job != other.person.job) as i32 as f32 + GeneralPerson::cosine_distance(&self.person.character, &self.person.character)
+        (self.person.job != other.person.job) as i32 as f32
+            + GeneralPerson::cosine_distance(&self.person.character, &self.person.character)
     }
 
     fn scalar_product<T: Add<Output = T> + Default>(lhs: &[T], rhs: &[T]) -> T
@@ -73,13 +85,13 @@ impl GeneralPerson {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub (crate) struct Phrase {
-    pub (crate) texts: Vec<String>,
-    pub (crate) responses: Vec<(usize, GeneralPerson)>,
+pub(crate) struct Phrase {
+    pub(crate) texts: Vec<String>,
+    pub(crate) responses: Vec<(usize, GeneralPerson)>,
 }
 
 impl Phrase {
-    pub (crate) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Phrase {
             texts: Vec::new(),
             responses: Vec::new(),
@@ -88,10 +100,10 @@ impl Phrase {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
-pub (crate) struct WordCloud(String);
+pub(crate) struct WordCloud(String);
 
 impl WordCloud {
-    pub (crate) fn new(s: &str) -> Self {
+    pub(crate) fn new(s: &str) -> Self {
         WordCloud(s.to_string())
     }
 }
@@ -101,11 +113,14 @@ impl FromStr for WordCloud {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(WordCloud::new(
-            s.replace(&['(', ')', ',', '\"', '.', ';', ':', '\'', '?', '!', '-'], "")
-                .to_lowercase()
-                .split(' ')
-                .fold(String::new(), |a, b| a + b + " ")
-                .trim_end()
+            s.replace(
+                &['(', ')', ',', '\"', '.', ';', ':', '\'', '?', '!', '-'],
+                "",
+            )
+            .to_lowercase()
+            .split(' ')
+            .fold(String::new(), |a, b| a + b + " ")
+            .trim_end(),
         ))
     }
 }
