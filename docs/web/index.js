@@ -4,17 +4,25 @@ const serverURL = "http://127.0.0.1:3000";
 
 const jobs = [
     "Farmer",
+    "Fisherman",
+    "Miner",
     "Merchant",
+    "Politician",
+    "Noble",
     "Priest"
 ]
 
 const traits = [
-    "hostile",
-    "rebellious"
+    "rebellion",
+    "fear_propension",
+    "popularity",
+    "animosity",
+    "political_agreement",
+    "fear"
 ]
 
-const minTrait = -5;
-const maxTrait = 5;
+const minTrait = -10;
+const maxTrait = 10;
 
 // returns number from Uniform[start, end]
 function randomInteger(start, end) {
@@ -40,8 +48,6 @@ function initialize() {
             chatButton.textContent = "Restart";
             postPhrases();
         } else {
-            chatButton.textContent = "Chat";
-            chat = Chat.new(database, youTalk);
             restartSituation();
         }
     });
@@ -79,6 +85,13 @@ function restartSituation() {
     }
 
     chatHistory.textContent = "";
+
+    if (chat) {
+        updateDatabase();
+    } else {
+        chat = ClientChat.new(database, youTalk, serializePerson());
+        chatButton.textContent = "Chat";
+    }
 }
 
 function serializePerson() {
@@ -90,26 +103,42 @@ function serializePerson() {
 }
 
 let youTalk = randomInteger(0, 1) === 0;
-initialize();
-restartSituation();
-
-const person = serializePerson();
+let chat = null;
 const database = ClientDatabase.new();
-let chat = ClientChat.new(database, youTalk, person);
 
 function loadDatabase() {
-    var xmlHttp = new XMLHttpRequest();
+    let xmlHttp = new XMLHttpRequest();
     xmlHttp.onreadystatechange = () => { 
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
-            server_database = ClientDatabase.from_str(xmlHttp.responseText);
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+            const server_database = ClientDatabase.from_str(xmlHttp.responseText);
             if (server_database) {
                 database.merge(server_database);
             }
+            initialize();
+            restartSituation();
+        }
     }
-    xmlHttp.open("GET", serverURL, true);
+    xmlHttp.open("GET", serverURL + "/database", true);
     xmlHttp.send(null);
 }
-// loadDatabase();
+
+loadDatabase();
+
+function updateDatabase() {
+    let xmlHttp = new XMLHttpRequest();
+    xmlHttp.onreadystatechange = () => { 
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+            const difference = ClientDatabase.from_str(xmlHttp.responseText);
+            if (difference) {
+                database.merge(difference);
+            }
+            chat = ClientChat.new(database, youTalk, serializePerson());
+            chatButton.textContent = "Chat";
+        }
+    }
+    xmlHttp.open("POST", serverURL + "/database", true);
+    xmlHttp.send(database.difference().to_string());
+}
 
 function postPhrases() {
     const phrases = chat.get_phrases();
