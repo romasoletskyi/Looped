@@ -162,11 +162,8 @@ impl Database {
 }
 
 impl Database {
-    pub(crate) fn get_start_index(&self) -> usize {
-        *self
-            .phrase_indices
-            .get(&WordCloud::from_str("").unwrap())
-            .unwrap()
+    pub(crate) fn get_start_index(&self) -> Option<usize> {
+        self.phrase_indices.get(&WordCloud::from_str("").unwrap()).copied()
     }
 
     pub(crate) fn insert_texts_at<I: IntoIterator<Item = String>>(

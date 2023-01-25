@@ -1,6 +1,6 @@
 import { ClientDatabase, ClientChat } from "wasm-core"
 
-const serverURL = "http://104.155.14.233:3000";
+const serverURL = "https://104.155.14.233:3000";
 
 const jobs = [
     "Farmer",

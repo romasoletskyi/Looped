@@ -35,22 +35,24 @@ impl Chat {
     }
 
     pub fn get_phrases(&mut self) -> Vec<String> {
-        let index = self.query.unwrap_or(self.get_database().get_start_index());
-        let options = self.get_database().phrases[index].responses.clone();
+        if let Some(index) = self.query.or_else(|| self.get_database().get_start_index()) {
+            let options = self.get_database().phrases[index].responses.clone();
 
-        let probability: Vec<f32> = options
-            .iter()
-            .map(|person| f32::exp(-person.1.distance(&self.person)))
-            .collect();
-        let queries = self.sample_queries(options, probability);
+            let probability: Vec<f32> = options
+                .iter()
+                .map(|person| f32::exp(-person.1.distance(&self.person)))
+                .collect();
+            let queries = self.sample_queries(options, probability);
 
-        let text_options = queries
-            .iter()
-            .map(|query| self.choose_random_phrase(*query))
-            .collect();
-        self.query_options = queries;
-
-        text_options
+            let text_options = queries
+                .iter()
+                .map(|query| self.choose_random_phrase(*query))
+                .collect();
+            self.query_options = queries;
+            text_options
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn add_phrase(&mut self, text: &str) {
@@ -80,7 +82,7 @@ impl Chat {
     }
 
     fn add_response(&mut self, response_index: usize) {
-        let previous_index = self.query.unwrap_or(self.get_database().get_start_index());
+        let previous_index = self.query.unwrap_or(self.get_database().get_start_index().unwrap());
         let person = self.person;
         self.get_database()
             .insert_responses_to(previous_index, vec![(response_index, person)]);
