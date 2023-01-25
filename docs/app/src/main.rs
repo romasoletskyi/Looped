@@ -1,9 +1,17 @@
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use std::pin::Pin;
+use std::{fs, io};
 
-use hyper::server::conn::AddrStream;
+use futures_util::{ready, Future};
+use futures_util::task::{Context, Poll};
+use hyper::server::conn::{AddrStream, AddrIncoming};
+use hyper::server::accept::Accept;
 use hyper::header::{self, HeaderValue};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use rustls::ServerConfig;
 use log::{info, warn};
 
 use core::database::Database;
@@ -19,6 +27,135 @@ fn enable_cors(response: &mut Response<Body>) {
     headers.insert(header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("300"));
 }
 
+fn load_certs(filename: &str) -> io::Result<Vec<rustls::Certificate>> {
+    let certfile = fs::File::open(filename)?;
+    let mut reader = io::BufReader::new(certfile);
+
+    let certs = rustls_pemfile::certs(&mut reader)?;
+    Ok(certs
+        .into_iter()
+        .map(rustls::Certificate)
+        .collect())
+}
+
+fn load_private_key(filename: &str) -> io::Result<rustls::PrivateKey> {
+    let keyfile = fs::File::open(filename)?;
+    let mut reader = io::BufReader::new(keyfile);
+
+    let keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
+    Ok(rustls::PrivateKey(keys[0].clone()))
+}
+
+enum State {
+    Handshaking(tokio_rustls::Accept<AddrStream>),
+    Streaming(tokio_rustls::server::TlsStream<AddrStream>),
+}
+
+pub struct TlsStream {
+    state: State,
+}
+
+impl TlsStream {
+    fn new(stream: AddrStream, config: Arc<ServerConfig>) -> TlsStream {
+        let accept = tokio_rustls::TlsAcceptor::from(config).accept(stream);
+        TlsStream {
+            state: State::Handshaking(accept),
+        }
+    }
+
+    fn remote_addr(&self) -> Option<SocketAddr> {
+        match &self.state {
+            State::Handshaking(stream) => stream.get_ref().map(|x| x.remote_addr()),
+            State::Streaming(stream) => Some(stream.get_ref().0.remote_addr())
+        }
+    }
+}
+
+impl AsyncRead for TlsStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut ReadBuf,
+    ) -> Poll<io::Result<()>> {
+        let pin = self.get_mut();
+        match pin.state {
+            State::Handshaking(ref mut accept) => match ready!(Pin::new(accept).poll(cx)) {
+                Ok(mut stream) => {
+                    let result = Pin::new(&mut stream).poll_read(cx, buf);
+                    pin.state = State::Streaming(stream);
+                    result
+                }
+                Err(err) => Poll::Ready(Err(err)),
+            },
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for TlsStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let pin = self.get_mut();
+        match pin.state {
+            State::Handshaking(ref mut accept) => match ready!(Pin::new(accept).poll(cx)) {
+                Ok(mut stream) => {
+                    let result = Pin::new(&mut stream).poll_write(cx, buf);
+                    pin.state = State::Streaming(stream);
+                    result
+                }
+                Err(err) => Poll::Ready(Err(err)),
+            },
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.state {
+            State::Handshaking(_) => Poll::Ready(Ok(())),
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.state {
+            State::Handshaking(_) => Poll::Ready(Ok(())),
+            State::Streaming(ref mut stream) => Pin::new(stream).poll_shutdown(cx),
+        }
+    }
+}
+
+pub struct TlsAcceptor {
+    config: Arc<ServerConfig>,
+    incoming: AddrIncoming,
+}
+
+impl TlsAcceptor {
+    pub fn new(config: Arc<ServerConfig>, incoming: AddrIncoming) -> TlsAcceptor {
+        TlsAcceptor { config, incoming }
+    }
+}
+
+impl Accept for TlsAcceptor {
+    type Conn = TlsStream;
+    type Error = io::Error;
+
+    fn poll_accept(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<TlsStream, Self::Error>>> {
+        let pin = self.get_mut();
+        match ready!(Pin::new(&mut pin.incoming).poll_accept(cx)) {
+            Some(Ok(sock)) => Poll::Ready(Some(Ok(TlsStream::new(sock, pin.config.clone())))),
+            Some(Err(e)) => Poll::Ready(Some(Err(e))),
+            None => Poll::Ready(None),
+        }
+    }
+}
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::init();
@@ -26,8 +163,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = ([0, 0, 0, 0], 3000).into();
     let database = Arc::new(Mutex::new(Database::new()));
 
-    let service = make_service_fn(move |con: &AddrStream| {
-        let address = con.remote_addr().to_string();
+    let tls_cfg = {
+        let certs = load_certs("certificate.crt")?;
+        let key = load_private_key("private.key")?;
+
+        let mut cfg = ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)?;
+        cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+        Arc::new(cfg)
+    };
+
+    let service = make_service_fn(move |con: &TlsStream| {
+        let address = con.remote_addr().map(|x| x.to_string()).unwrap_or_default();
         let database = database.clone();
         async move {
             Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
@@ -84,8 +233,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
-    let server = Server::bind(&addr).serve(service);
-    info!("Listening on http://{}", addr);
+    let server = Server::builder(TlsAcceptor::new(tls_cfg, AddrIncoming::bind(&addr)?)).serve(service);
+    info!("Listening on https://{}", addr);
 
     server.await?;
     Ok(())
