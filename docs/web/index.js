@@ -1,6 +1,6 @@
 import { ClientDatabase, ClientChat } from "wasm-core"
 
-const serverURL = "http://127.0.0.1:3000";
+const serverURL = "http://104.155.14.233:3000";
 
 const jobs = [
     "Farmer",
@@ -34,7 +34,11 @@ const jobDescription = document.getElementById("job-selector");
 const traitList = document.getElementById("poll-character");
 const phraseList = document.getElementById("poll-phrase");
 const chatButton = document.getElementById("start");
+const generateButton = document.getElementById("generate");
 const chatHistory = document.getElementById("chat-history");
+const saveButton = document.getElementById("save-button");
+const dataSize = document.getElementById("data-size");
+const mode = document.getElementById("mode");
 
 function initialize() {
     for (const job of jobs) {
@@ -45,12 +49,45 @@ function initialize() {
 
     chatButton.addEventListener("click", () => {
         if (chatButton.textContent == "Chat") {
+            chatHistory.textContent = "";
             chatButton.textContent = "Restart";
+            generateButton.style.visibility = "hidden";
+
+            chat = ClientChat.new(database, youTalk, serializePerson());
+            chat.start();
+
             postPhrases();
         } else {
+            chatHistory.textContent = "";
+            generateButton.style.visibility = "visible";
+
             restartSituation();
         }
     });
+
+    generateButton.addEventListener("click", () => {
+        chatHistory.textContent = "";
+        chatButton.textContent = "Chat";
+        phraseList.textContent = "";
+
+        const oldyouTalk = youTalk;
+        chat = ClientChat.new(database, youTalk, serializePerson());
+
+        let phrases = chat.get_phrases();
+        while (phrases.length > 0) {
+            const index = randomInteger(0, phrases.length - 1);
+            const phrase = phrases[index];
+
+            chat.choose_phrase_immutably(index);
+            updateChatHistory(phrase, 0);
+
+            phrases = chat.get_phrases();
+        }
+
+        youTalk = oldyouTalk;
+    });
+
+    saveButton.addEventListener("click", saveConversationBackup);
 }
 
 function restartSituation() {
@@ -84,13 +121,16 @@ function restartSituation() {
         traitList.appendChild(op);
     }
 
-    chatHistory.textContent = "";
-
     if (chat) {
         updateDatabase();
     } else {
-        chat = ClientChat.new(database, youTalk, serializePerson());
         chatButton.textContent = "Chat";
+    }
+
+    if (online) {
+        mode.textContent = "online";
+    } else {
+        mode.textContent = "offline";
     }
 }
 
@@ -103,23 +143,31 @@ function serializePerson() {
 }
 
 let youTalk = randomInteger(0, 1) === 0;
+let databaseSize = 0;
 let chat = null;
+let online = false;
+
 const database = ClientDatabase.new();
 
 function loadDatabase() {
     let xmlHttp = new XMLHttpRequest();
     xmlHttp.onreadystatechange = () => { 
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-            const server_database = ClientDatabase.from_str(xmlHttp.responseText);
-            if (server_database) {
-                database.merge(server_database);
+        if (xmlHttp.readyState == 4) {
+            if (xmlHttp.status == 200) {
+                const server_database = ClientDatabase.from_str(xmlHttp.responseText);
+                if (server_database) {
+                    database.merge(server_database);
+                }
+                online = true;
             }
+            databaseSize = database.size();
+            dataSize.textContent = databaseSize.toString();
             initialize();
             restartSituation();
         }
-    }
+    };
     xmlHttp.open("GET", serverURL + "/database", true);
-    xmlHttp.send(null);
+    xmlHttp.send();
 }
 
 loadDatabase();
@@ -127,15 +175,19 @@ loadDatabase();
 function updateDatabase() {
     let xmlHttp = new XMLHttpRequest();
     xmlHttp.onreadystatechange = () => { 
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-            const difference = ClientDatabase.from_str(xmlHttp.responseText);
-            if (difference) {
-                database.merge(difference);
+        if (xmlHttp.readyState == 4) {
+            if (xmlHttp.status == 200) {
+                const difference = ClientDatabase.from_str(xmlHttp.responseText);
+                if (difference) {
+                    database.merge(difference);
+                }
+                online = true;
+            } else {
+                online = false;
             }
-            chat = ClientChat.new(database, youTalk, serializePerson());
             chatButton.textContent = "Chat";
         }
-    }
+    };
     xmlHttp.open("POST", serverURL + "/database", true);
     xmlHttp.send(database.difference().to_string());
 }
@@ -153,8 +205,7 @@ function postPhrases() {
         op.textContent = phrase;
         op.addEventListener("click", () => {
             chat.choose_phrase(index);
-            updateChatHistory(phrase);
-            youTalk = !youTalk;
+            updateChatHistory(phrase, 1);
             postPhrases();
         });
 
@@ -179,8 +230,7 @@ function postPhrases() {
         line.addEventListener("keydown", (event) => {
             if (event.key == "Enter") {
                 chat.add_phrase(line.value);
-                updateChatHistory(line.value);
-                youTalk = !youTalk;
+                updateChatHistory(line.value, 1);
                 postPhrases();
             }
         });
@@ -191,7 +241,7 @@ function postPhrases() {
     phraseList.appendChild(op);
 }
 
-function updateChatHistory(message) {
+function updateChatHistory(message, delta) {
     const op = document.createElement("div");
     op.textContent = message;
 
@@ -203,6 +253,10 @@ function updateChatHistory(message) {
     }
 
     chatHistory.appendChild(op);
+
+    databaseSize += delta
+    dataSize.textContent = databaseSize.toString();
+    youTalk = !youTalk;
 }
 
 function saveConversationBackup() {
