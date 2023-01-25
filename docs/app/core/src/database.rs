@@ -77,6 +77,7 @@ pub struct Database {
     pub(crate) phrases: Vec<Phrase>,
     phrase_indices: HashMap<WordCloud, usize>,
     manager: DifferenceManager,
+    size: usize
 }
 
 impl Database {
@@ -85,6 +86,7 @@ impl Database {
             phrases: Vec::new(),
             phrase_indices: HashMap::new(),
             manager: DifferenceManager::new(),
+            size: 0
         }
     }
 
@@ -94,6 +96,10 @@ impl Database {
 
     pub fn from_slice(slice: &[u8]) -> Option<Database> {
         serde_json::from_slice(slice).ok()
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     pub fn updated(&mut self, client: &str) {
@@ -199,7 +205,10 @@ impl Database {
     ) {
         self.manager
             .insert_response(index, self.phrases[index].responses.len());
-        self.phrases[index].responses.extend(responses);
+        self.phrases[index].responses.extend(responses.into_iter().map(|x| {
+            self.size += 1;
+            x
+        }));
     }
 
     fn add_difference(
@@ -233,6 +242,7 @@ impl Database {
             Vec::new()
         };
 
+        database.size += responses.len();
         database.phrases.push(Phrase { texts, responses });
     }
 }

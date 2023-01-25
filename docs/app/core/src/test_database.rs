@@ -1,4 +1,4 @@
-use rand::{rngs::ThreadRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashSet;
 use std::iter::zip;

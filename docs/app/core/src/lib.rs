@@ -5,4 +5,5 @@ pub mod wasm;
 mod chat;
 mod data;
 
+#[cfg(test)]
 mod test_database;

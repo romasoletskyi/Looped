@@ -23,7 +23,7 @@ fn enable_cors(response: &mut Response<Body>) {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::init();
 
-    let addr = ([127, 0, 0, 1], 3000).into();
+    let addr = ([0, 0, 0, 0], 3000).into();
     let database = Arc::new(Mutex::new(Database::new()));
 
     let service = make_service_fn(move |con: &AddrStream| {
@@ -83,8 +83,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }))
         }
     });
-
-    // TODO dumping json to gitlab
 
     let server = Server::bind(&addr).serve(service);
     info!("Listening on http://{}", addr);

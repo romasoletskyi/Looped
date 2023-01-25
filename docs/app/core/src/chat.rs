@@ -18,8 +18,6 @@ pub struct Chat {
 
 impl Chat {
     pub fn new(database: &mut Database, you_talk: bool, person_descrirption: &str) -> Self {
-        database.insert_texts_at("", vec!["".to_string()]);
-
         Chat {
             database,
             gen: thread_rng(),
@@ -30,6 +28,10 @@ impl Chat {
                 you_talk,
             ),
         }
+    }
+
+    pub fn start(&mut self) {
+        self.get_database().insert_texts_at("", vec!["".to_string()]);
     }
 
     pub fn get_phrases(&mut self) -> Vec<String> {
@@ -65,6 +67,10 @@ impl Chat {
         let response_index = self.query_options[option_number];
         self.add_response(response_index);
         self.finish_turn(response_index);
+    }
+
+    pub fn choose_phrase_immutably(&mut self, option_number: usize) {
+        self.finish_turn(self.query_options[option_number]);
     }
 }
 

@@ -29,14 +29,15 @@ impl ClientDatabase {
     }
 
     pub fn from_str(s: &str) -> Option<ClientDatabase> {
-        Database::from_str(s).map(|mut database| {
-            database.updated(SERVER);
-            ClientDatabase(database)
-        })
+        Database::from_str(s).map(|x| ClientDatabase(x))
     }
 
     pub fn to_string(&self) -> String {
         self.0.to_string()
+    }
+
+    pub fn size(&self) -> usize {
+        self.0.size()
     }
 
     pub fn merge(&mut self, database: ClientDatabase) {
@@ -58,6 +59,10 @@ impl ClientChat {
         ClientChat(Chat::new(&mut database.0, you_talk, person_description))
     }
 
+    pub fn start(&mut self) {
+        self.0.start();
+    }
+
     pub fn get_phrases(&mut self) -> Box<[JsValue]> {
         iter_to_jsarray(self.0.get_phrases().iter())
     }
@@ -68,5 +73,9 @@ impl ClientChat {
 
     pub fn choose_phrase(&mut self, option_number: usize) {
         self.0.choose_phrase(option_number);
+    }
+
+    pub fn choose_phrase_immutably(&mut self, option_number: usize) {
+        self.0.choose_phrase_immutably(option_number);
     }
 }
