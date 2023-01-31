@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <title>Dialog Builder</title>
+      <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="info">
+      <div>Number of responses: <span id="data-size">0</span></div>
+      <div>Mode: <span id="mode">offline</span></div>
+      <button type="button" id="save-button">Save</button>
+    </div>
+    <div>
+      <label for="job-selector" id="poll-job"></label>
+      <select id="job-selector"></select>
+    </div>
+    <div>Based on looks they are:</div>
+    <div id="poll-character"></div>
+    <div>
+        <button type="button" id="start">Chat</button>
+        <button type="button" id="generate">Generate</button>
+    </div>
+    <hr>
+    <div id="chat-history"></div>
+    <hr>
+    <div id="poll-phrase"></div>
+    <script src="./bootstrap.js"></script>
+  </body>
+</html>

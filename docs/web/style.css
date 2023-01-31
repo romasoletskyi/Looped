@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css?family=Red+Hat+Display:400,500,900&display=swap');
+  
+body, html {
+  font-family: Red hat Display, sans-serif;
+  font-weight: 400;
+  line-height: 1.25em;
+  letter-spacing: 0.025em;
+  color: #333;
+  background: #F7F7F7;
+}
+
+label {
+    display: inline-block;
+    text-align: right;
+    clear: both;
+}
+
+button {
+    color: #333;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: inherit;
+    line-height: inherit;
+}
+
+select {
+    background-color: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+#add-answer {
+    float: left;
+    padding: 0 15px 0 0;
+}
+
+#poll-answer {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.message {
+    box-sizing: border-box;
+    padding: 0.5rem 1rem;
+    margin: 1rem;
+    background: #FFF;
+    border-radius: 1.125rem 1.125rem 1.125rem 0;
+    min-height: 2.25rem;
+    width: fit-content;
+    max-width: 66%;
+}
+
+.message.your {
+    margin: 1rem 1rem 1rem auto ;
+    border-radius: 1.125rem 1.125rem 0 1.125rem;
+    background: #333;
+    color: white;
+}
+
+#info {
+    position: absolute; 
+    top: 0; 
+    right: 0; 
+    width: 250px; 
+    text-align:left;
+}
